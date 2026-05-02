@@ -24,7 +24,7 @@ const navItems: { section: string; items: NavItem[] }[] = [
     section: "MAIN",
     items: [
       { label: "Overview", href: "/overview", icon: LayoutDashboard },
-      { label: "Log expense", href: "/log", icon: MessageSquare, badge: "AI" },
+      { label: "Chat", href: "/log", icon: MessageSquare, badge: "AI" },
       { label: "Ledger", href: "/ledger", icon: ScrollText },
     ],
   },
