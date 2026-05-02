@@ -16,11 +16,8 @@ export default async function OverviewPage() {
   const monthLabel = now.toLocaleString("en-US", { month: "long", year: "numeric" });
 
   return (
-    <div className="max-w-2xl">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">{monthLabel}</h1>
-      </div>
-
+    <div>
+      <p className="mb-6 text-sm text-neutral-500">{monthLabel}</p>
       <div className="flex flex-col gap-4">
         <StatsCards income={stats.income} expenses={stats.expenses} saved={stats.saved} />
         <TrendChart data={trend} />

@@ -15,8 +15,7 @@ export default function SplitwisePage() {
   const { youOwe, owedToYou } = dummySplitwise;
 
   return (
-    <div className="max-w-xl">
-      <h1 className="mb-6 text-2xl font-semibold text-neutral-900">Splitwise</h1>
+    <div>
 
       <div className="flex flex-col gap-4">
         <div className="rounded-xl bg-white p-5 shadow-sm">

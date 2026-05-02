@@ -78,8 +78,7 @@ export default async function LedgerPage() {
 
   if (transactions.length === 0) {
     return (
-      <div className="max-w-xl">
-        <h1 className="mb-6 text-2xl font-semibold text-neutral-900">Ledger</h1>
+      <div>
         <div className="rounded-xl bg-white p-8 shadow-sm text-center">
           <p className="text-sm text-neutral-400">No transactions yet. Log your first expense in the chat.</p>
         </div>
@@ -88,19 +87,16 @@ export default async function LedgerPage() {
   }
 
   return (
-    <div className="max-w-xl">
-      <div className="mb-6 flex items-end justify-between">
-        <h1 className="text-2xl font-semibold text-neutral-900">Ledger</h1>
-        <div className="flex gap-4 text-sm">
-          <span className="text-neutral-400">
-            <span className="font-medium text-green-600">+${totalIncome.toFixed(2)}</span>
-            {" "}income
-          </span>
-          <span className="text-neutral-400">
-            <span className="font-medium text-neutral-800">-${totalExpenses.toFixed(2)}</span>
-            {" "}spent
-          </span>
-        </div>
+    <div>
+      <div className="mb-6 flex items-center justify-end gap-4 text-sm">
+        <span className="text-neutral-400">
+          <span className="font-medium text-green-600">+${totalIncome.toFixed(2)}</span>
+          {" "}income
+        </span>
+        <span className="text-neutral-400">
+          <span className="font-medium text-neutral-800">-${totalExpenses.toFixed(2)}</span>
+          {" "}spent
+        </span>
       </div>
 
       <div className="flex flex-col gap-4">
