@@ -15,25 +15,33 @@ function StatCard({ label, value, sub, valueColor = "text-neutral-900" }: StatCa
   );
 }
 
-export default function StatsCards() {
+interface StatsCardsProps {
+  income: number;
+  expenses: number;
+  saved: number;
+}
+
+export default function StatsCards({ income, expenses, saved }: StatsCardsProps) {
+  const savingsPct = income > 0 ? Math.round((saved / income) * 100) : 0;
+
   return (
     <div className="flex gap-4">
       <StatCard
         label="Income"
-        value="$6,200"
-        sub="salary + freelance"
+        value={`$${income.toLocaleString()}`}
+        sub="this month"
         valueColor="text-green-600"
       />
       <StatCard
         label="Expenses"
-        value="$3,840"
-        sub="↑ $310 vs April"
+        value={`$${expenses.toLocaleString()}`}
+        sub="this month"
         valueColor="text-red-500"
       />
       <StatCard
         label="Saved"
-        value="$2,360"
-        sub="38% of income"
+        value={`$${saved.toLocaleString()}`}
+        sub={`${savingsPct}% of income`}
       />
     </div>
   );

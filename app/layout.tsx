@@ -5,11 +5,15 @@ import "./globals.css";
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
 
 export const metadata: Metadata = {
-  title: "kharcha.app",
+  title: "kharche",
   description: "Personal finance tracker",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" className={`${geist.variable} h-full`}>
       <body className="h-full antialiased">{children}</body>

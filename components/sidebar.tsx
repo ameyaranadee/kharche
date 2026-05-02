@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, MessageSquare, Users, CreditCard, TrendingUp } from "lucide-react";
+import {
+  LayoutDashboard,
+  MessageSquare,
+  ScrollText,
+  Users,
+  CreditCard,
+  TrendingUp,
+} from "lucide-react";
 
 type NavItem = {
   label: string;
@@ -18,6 +25,7 @@ const navItems: { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Overview", href: "/overview", icon: LayoutDashboard },
       { label: "Log expense", href: "/log", icon: MessageSquare, badge: "AI" },
+      { label: "Ledger", href: "/ledger", icon: ScrollText },
     ],
   },
   {
@@ -30,7 +38,13 @@ const navItems: { section: string; items: NavItem[] }[] = [
   {
     section: "COMING SOON",
     items: [
-      { label: "Investments", href: "#", icon: TrendingUp, disabled: true, badge: "soon" },
+      {
+        label: "Investments",
+        href: "#",
+        icon: TrendingUp,
+        disabled: true,
+        badge: "soon",
+      },
     ],
   },
 ];
@@ -42,7 +56,7 @@ export default function Sidebar() {
     <aside className="w-48 shrink-0 flex flex-col bg-white border-r border-neutral-200 px-4 py-5">
       <div className="mb-6 px-1">
         <span className="text-[15px] font-semibold tracking-tight text-neutral-900">
-          kharcha<span className="text-neutral-400">.app</span>
+          kharche<span className="text-neutral-400"></span>
         </span>
       </div>
 
@@ -65,8 +79,8 @@ export default function Sidebar() {
                         item.disabled
                           ? "cursor-default text-neutral-300 pointer-events-none"
                           : active
-                          ? "bg-neutral-100 font-medium text-neutral-900"
-                          : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+                            ? "bg-neutral-100 font-medium text-neutral-900"
+                            : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
                       }`}
                     >
                       <Icon size={15} strokeWidth={1.8} />
@@ -77,7 +91,9 @@ export default function Sidebar() {
                         </span>
                       )}
                       {item.badge === "soon" && (
-                        <span className="text-[10px] text-neutral-300">soon</span>
+                        <span className="text-[10px] text-neutral-300">
+                          soon
+                        </span>
                       )}
                     </Link>
                   </li>

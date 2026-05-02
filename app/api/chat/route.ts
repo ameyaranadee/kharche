@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { insertTransaction, insertSplit, insertSubscription } from "@/lib/db";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -36,18 +37,19 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: "create_split",
-    description: "Create a bill split with another person",
+    description: "Log a transaction and create a bill split with another person",
     input_schema: {
       type: "object" as const,
       properties: {
-        merchant: { type: "string", description: "Where the expense was" },
+        merchant: { type: "string" },
         total_amount: { type: "number", description: "Total bill amount (positive)" },
         split_amount: { type: "number", description: "Amount owed by or to the other person" },
-        with_person: { type: "string", description: "Name of the person you split with" },
-        date: { type: "string", description: "Date in YYYY-MM-DD format" },
-        you_paid: { type: "boolean", description: "True if you paid the bill, false if they paid" },
+        with_person: { type: "string" },
+        date: { type: "string", description: "YYYY-MM-DD" },
+        you_paid: { type: "boolean", description: "True if you paid the full bill" },
+        category: { type: "string", enum: ["Dining", "Groceries", "Transport", "Entertainment", "Shopping", "Travel", "Other"] },
       },
-      required: ["merchant", "total_amount", "split_amount", "with_person", "date", "you_paid"],
+      required: ["merchant", "total_amount", "split_amount", "with_person", "date", "you_paid", "category"],
     },
   },
   {
@@ -56,75 +58,73 @@ const tools: Anthropic.Tool[] = [
     input_schema: {
       type: "object" as const,
       properties: {
-        merchant: { type: "string", description: "Subscription service name" },
+        merchant: { type: "string" },
         amount: { type: "number", description: "Monthly/yearly amount (positive)" },
-        cycle: { type: "string", enum: ["monthly", "yearly", "weekly"], description: "Billing cycle" },
-        next_renewal_date: { type: "string", description: "Next renewal date in YYYY-MM-DD format" },
+        cycle: { type: "string", enum: ["monthly", "yearly", "weekly"] },
+        next_renewal_date: { type: "string", description: "YYYY-MM-DD" },
       },
       required: ["merchant", "amount", "cycle", "next_renewal_date"],
     },
   },
 ];
 
-function executeToolCall(name: string, input: Record<string, unknown>): string {
-  if (name === "log_transaction") {
-    const { merchant, amount, date, category, notes } = input as {
-      merchant: string; amount: number; date: string; category: string; notes?: string;
-    };
-    const sign = amount > 0 ? "+" : "";
-    return JSON.stringify({
-      success: true,
-      message: `Logged: ${merchant} ${sign}$${Math.abs(amount)} on ${date} (${category})${notes ? ` — ${notes}` : ""}`,
-    });
+async function executeToolCall(name: string, input: Record<string, unknown>): Promise<string> {
+  try {
+    if (name === "log_transaction") {
+      const { merchant, amount, date, category, notes } = input as {
+        merchant: string; amount: number; date: string; category: string; notes?: string;
+      };
+      await insertTransaction({ merchant, amount, date, category, notes, source: "chat" });
+      const sign = amount > 0 ? "+" : "-";
+      return JSON.stringify({ success: true, message: `Logged: ${merchant} ${sign}$${Math.abs(amount)} on ${date}` });
+    }
+
+    if (name === "create_split") {
+      const { merchant, total_amount, split_amount, with_person, date, you_paid, category } = input as {
+        merchant: string; total_amount: number; split_amount: number;
+        with_person: string; date: string; you_paid: boolean; category: string;
+      };
+      const myAmount = you_paid ? -(total_amount - split_amount) : -split_amount;
+      const txn = await insertTransaction({ merchant, amount: myAmount, date, category, source: "chat" });
+      await insertSplit({ txn_id: txn.id, with_person, owed: split_amount });
+      const direction = you_paid ? `${with_person} owes you` : `you owe ${with_person}`;
+      return JSON.stringify({ success: true, message: `Split logged: ${merchant} — ${direction} $${split_amount.toFixed(2)}` });
+    }
+
+    if (name === "tag_subscription") {
+      const { merchant, amount, cycle, next_renewal_date } = input as {
+        merchant: string; amount: number; cycle: string; next_renewal_date: string;
+      };
+      const txn = await insertTransaction({
+        merchant, amount: -amount, date: new Date().toISOString().slice(0, 10),
+        category: "Subscriptions", source: "chat",
+      });
+      await insertSubscription({ merchant, amount, cycle, next_renewal_date, linked_txn_id: txn.id });
+      return JSON.stringify({ success: true, message: `Subscription tagged: ${merchant} $${amount}/${cycle}` });
+    }
+
+    return JSON.stringify({ success: false, message: "Unknown tool" });
+  } catch (err) {
+    console.error(`Tool ${name} error:`, err);
+    return JSON.stringify({ success: false, message: "Failed to save. Please try again." });
   }
-  if (name === "create_split") {
-    const { merchant, split_amount, with_person, you_paid } = input as {
-      merchant: string; split_amount: number; with_person: string; you_paid: boolean;
-    };
-    const direction = you_paid ? `${with_person} owes you` : `you owe ${with_person}`;
-    return JSON.stringify({
-      success: true,
-      message: `Split created: ${merchant} — ${direction} $${split_amount.toFixed(2)}`,
-    });
-  }
-  if (name === "tag_subscription") {
-    const { merchant, amount, cycle } = input as {
-      merchant: string; amount: number; cycle: string;
-    };
-    return JSON.stringify({
-      success: true,
-      message: `Tagged ${merchant} as a ${cycle} subscription at $${amount}/month`,
-    });
-  }
-  return JSON.stringify({ success: false, message: "Unknown tool" });
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json() as {
-      messages: Anthropic.MessageParam[];
-    };
-
-    const userMessages = messages.filter((m) => m.role === "user");
-    if (!userMessages.length) {
+    const { messages } = await req.json() as { messages: Anthropic.MessageParam[] };
+    if (!messages?.length) {
       return NextResponse.json({ reply: "No message provided." }, { status: 400 });
     }
 
     let currentMessages: Anthropic.MessageParam[] = messages;
     let finalReply = "";
 
-    // Agentic loop — handle tool calls until end_turn
     for (let i = 0; i < 5; i++) {
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 1024,
-        system: [
-          {
-            type: "text",
-            text: SYSTEM_PROMPT,
-            cache_control: { type: "ephemeral" },
-          },
-        ],
+        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
         tools,
         messages: currentMessages,
       });
@@ -139,22 +139,17 @@ export async function POST(req: NextRequest) {
         const toolUseBlocks = response.content.filter(
           (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
         );
+        currentMessages = [...currentMessages, { role: "assistant", content: response.content }];
 
-        currentMessages = [
-          ...currentMessages,
-          { role: "assistant", content: response.content },
-        ];
+        const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+          toolUseBlocks.map(async (block) => ({
+            type: "tool_result" as const,
+            tool_use_id: block.id,
+            content: await executeToolCall(block.name, block.input as Record<string, unknown>),
+          }))
+        );
 
-        const toolResults: Anthropic.ToolResultBlockParam[] = toolUseBlocks.map((block) => ({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: executeToolCall(block.name, block.input as Record<string, unknown>),
-        }));
-
-        currentMessages = [
-          ...currentMessages,
-          { role: "user", content: toolResults },
-        ];
+        currentMessages = [...currentMessages, { role: "user", content: toolResults }];
         continue;
       }
 

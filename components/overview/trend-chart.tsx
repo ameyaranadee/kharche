@@ -10,15 +10,13 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { dummyMonthlyData } from "@/lib/dummy-data";
+import { MonthlyData } from "@/lib/types";
 
-const formatDollar = (v: number) => `$${(v / 1000).toFixed(1)}k`;
-
-export default function TrendChart() {
+export default function TrendChart({ data }: { data: MonthlyData[] }) {
   return (
     <div className="rounded-xl bg-white p-5 shadow-sm">
       <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={dummyMonthlyData} barGap={4} barCategoryGap="28%">
+        <BarChart data={data} barGap={4} barCategoryGap="28%">
           <CartesianGrid vertical={false} stroke="#f0f0f0" />
           <XAxis
             dataKey="month"
@@ -26,10 +24,7 @@ export default function TrendChart() {
             tickLine={false}
             tick={{ fontSize: 12, fill: "#9ca3af" }}
           />
-          <YAxis
-            hide
-            tickFormatter={formatDollar}
-          />
+          <YAxis hide />
           <Tooltip
             formatter={(value) => [`$${Number(value).toLocaleString()}`]}
             cursor={{ fill: "#f5f5f5" }}
