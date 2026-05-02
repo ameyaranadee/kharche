@@ -56,7 +56,7 @@ export default function Sidebar() {
     <aside className="w-48 shrink-0 flex flex-col bg-white border-r border-neutral-200 px-4 py-5">
       <div className="mb-6 px-1">
         <span className="text-[15px] font-semibold tracking-tight text-neutral-900">
-          kharche<span className="text-neutral-400"></span>
+          kharche
         </span>
       </div>
 

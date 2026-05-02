@@ -25,8 +25,7 @@ export default async function SubscriptionsPage() {
 
   if (subscriptions.length === 0) {
     return (
-      <div className="max-w-xl">
-        <h1 className="mb-6 text-2xl font-semibold text-neutral-900">Subscriptions</h1>
+      <div>
         <div className="rounded-xl bg-white p-8 shadow-sm text-center">
           <p className="text-sm text-neutral-400">
             No subscriptions tracked yet. Tell the chat agent about a subscription and it'll appear here.
@@ -37,8 +36,7 @@ export default async function SubscriptionsPage() {
   }
 
   return (
-    <div className="max-w-xl">
-      <h1 className="mb-6 text-2xl font-semibold text-neutral-900">Subscriptions</h1>
+    <div>
 
       <div className="rounded-xl bg-white shadow-sm">
         {subscriptions.map((sub, i) => {
