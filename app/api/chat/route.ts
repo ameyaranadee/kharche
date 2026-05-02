@@ -4,16 +4,25 @@ import { insertTransaction, insertSplit, insertSubscription } from "@/lib/db";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const SYSTEM_PROMPT = `You are Kharche, a personal finance assistant. You help the user log expenses, split bills, and track subscriptions.
+function buildSystemPrompt() {
+  const today = new Date().toISOString().slice(0, 10);
+  return `You are Kharche, a personal finance assistant. You help the user log expenses, split bills, and track subscriptions.
+
+Today's date is ${today}. Use this as the default date for any transaction where the user doesn't specify a date.
 
 When the user describes a transaction or pastes bank statement rows, extract the details and call the appropriate tool:
 - Use log_transaction for any expense or income
 - Use create_split when the user mentions splitting a bill with someone
 - Use tag_subscription when the transaction looks like a recurring subscription
 
-Respond conversationally and confirm what you logged. If splitting, ask if they want to add it to Splitwise. Keep responses short and friendly.
+IMPORTANT: Call a tool at most once per transaction. If you have already called a tool for a transaction in this conversation, do not call it again — even if the user provides follow-up context. Respond conversationally instead.
+
+When you log a transaction, keep your text reply to one short friendly line (e.g. "Done! Anything else to log?"). Do NOT list out the transaction details in your reply — they will be shown to the user in a receipt card automatically.
+
+If splitting, ask if they want to log it to Splitwise. Keep responses short and friendly.
 
 Supported CSV formats: BofA (Date,Description,Amount,Running Bal.) and Discover (Trans. Date,Post Date,Description,Amount,Category).`;
+}
 
 const tools: Anthropic.Tool[] = [
   {
@@ -110,6 +119,13 @@ async function executeToolCall(name: string, input: Record<string, unknown>): Pr
   }
 }
 
+interface LoggedEntry {
+  merchant: string;
+  amount: number;
+  date: string;
+  category: string;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json() as { messages: Anthropic.MessageParam[] };
@@ -117,14 +133,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ reply: "No message provided." }, { status: 400 });
     }
 
-    let currentMessages: Anthropic.MessageParam[] = messages;
+    const cleanMessages: Anthropic.MessageParam[] = messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    let currentMessages: Anthropic.MessageParam[] = cleanMessages;
     let finalReply = "";
+    let logged: LoggedEntry | null = null;
 
     for (let i = 0; i < 5; i++) {
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 1024,
-        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+        system: [{ type: "text", text: buildSystemPrompt(), cache_control: { type: "ephemeral" } }],
         tools,
         messages: currentMessages,
       });
@@ -142,11 +164,22 @@ export async function POST(req: NextRequest) {
         currentMessages = [...currentMessages, { role: "assistant", content: response.content }];
 
         const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
-          toolUseBlocks.map(async (block) => ({
-            type: "tool_result" as const,
-            tool_use_id: block.id,
-            content: await executeToolCall(block.name, block.input as Record<string, unknown>),
-          }))
+          toolUseBlocks.map(async (block) => {
+            if (block.name === "log_transaction" && !logged) {
+              const input = block.input as Record<string, unknown>;
+              logged = {
+                merchant: input.merchant as string,
+                amount: input.amount as number,
+                date: input.date as string,
+                category: input.category as string,
+              };
+            }
+            return {
+              type: "tool_result" as const,
+              tool_use_id: block.id,
+              content: await executeToolCall(block.name, block.input as Record<string, unknown>),
+            };
+          })
         );
 
         currentMessages = [...currentMessages, { role: "user", content: toolResults }];
@@ -156,7 +189,7 @@ export async function POST(req: NextRequest) {
       break;
     }
 
-    return NextResponse.json({ reply: finalReply || "Got it!" });
+    return NextResponse.json({ reply: finalReply || "Got it!", logged });
   } catch (err) {
     console.error("Chat API error:", err);
     return NextResponse.json({ reply: "Something went wrong." }, { status: 500 });
